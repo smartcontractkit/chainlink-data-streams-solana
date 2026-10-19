@@ -1,6 +1,6 @@
 [package]
 name = "verifier"
-version = "0.4.0" # This version should align with the features of EVM verifier version
+version = "0.5.0" # This version should align with the features of EVM verifier version
 description = "Verifier for Data Streams"
 edition = "2021"
 
@@ -31,3 +31,4 @@ bytemuck = "1.19.0"
 solana-program-test = "1.18.26"
 solana-sdk = "1.18.26"
 test_utils = { path = "../../test_utils" }
+chainlink_solana_data_streams = { path = "../../crates/chainlink-solana-data-streams" }

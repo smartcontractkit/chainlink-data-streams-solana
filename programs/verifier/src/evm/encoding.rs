@@ -1,6 +1,5 @@
 use crate::domain::{Report, SignedReport};
 use crate::errors::ErrorCode;
-use anchor_lang::solana_program::keccak::hash as keccak256;
 use ethabi::{decode, ParamType, Token};
 use std::convert::TryInto;
 
@@ -84,8 +83,8 @@ impl Encoder {
         data: &[u8],
         offset: usize,
     ) -> Result<&[u8], ErrorCode> {
-        // Ensure the input has at least the minimum required length
-        if offset + WORD_SIZE > data.len() {
+        // Ensure the input has at least the minimum required length, without overflowing on malformed offsets
+        if offset.checked_add(WORD_SIZE).map_or(true, |end| end > data.len()) {
             return Err(ErrorCode::BadVerification);
         }
 
@@ -110,8 +109,8 @@ impl Encoder {
         data: &[u8],
         offset: usize,
     ) -> Result<&[[u8; WORD_SIZE]], ErrorCode> {
-        // Ensure the input has at least the minimum required length
-        if offset + WORD_SIZE > data.len() {
+        // Ensure the input has at least the minimum required length, without overflowing on malformed offsets
+        if offset.checked_add(WORD_SIZE).map_or(true, |end| end > data.len()) {
             return Err(ErrorCode::BadVerification);
         }
 
@@ -174,28 +173,5 @@ impl Encoder {
             feed_id,
             report_timestamp,
         })
-    }
-
-    pub fn encode_don_config_id(signers: &[[u8; 20]], f: u8) -> Vec<u8> {
-        // `abi.encodePacked` includes padding for array types. Padded to multiple of 32 bytes.
-        // `+1` for `f` byte
-        let mut encoded = Vec::with_capacity(signers.len() * WORD_SIZE + 1);
-        const PADDING: [u8; 12] = [0u8; 12];
-        for item in signers {
-            encoded.extend_from_slice(&PADDING);
-            encoded.extend_from_slice(&item[..]);
-        }
-        encoded.push(f);
-        encoded
-    }
-    
-
-    pub fn compute_don_config_id(encoded: &[u8]) -> [u8; 24] {
-        let hash = keccak256(encoded);
-        // For consistency with source chain contract - first 24 bytes of hash is `don_config_id`.
-        let don_config_id = hash.to_bytes()[..24]
-            .try_into()
-            .expect("Slice with incorrect length");
-        don_config_id
     }
 }

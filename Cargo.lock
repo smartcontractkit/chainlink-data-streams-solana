@@ -5603,6 +5603,7 @@ dependencies = [
  "access-controller",
  "anchor-lang",
  "arrayref",
+ "bytemuck",
  "ethabi",
  "hex",
  "hex-literal",
@@ -6101,12 +6102,13 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "verifier"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "access-controller",
  "anchor-lang",
  "arrayvec 1.0.1",
  "bytemuck",
+ "chainlink_solana_data_streams",
  "ethabi",
  "hex",
  "hex-literal",

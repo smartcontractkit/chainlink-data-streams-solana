@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "name": "verifier",
   "instructions": [
     {
@@ -34,56 +34,42 @@
       ]
     },
     {
-      "name": "setConfigWithActivationTime",
-      "accounts": [
-        {
-          "name": "verifierAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "signers",
-          "type": {
-            "vec": {
-              "array": [
-                "u8",
-                20
-              ]
-            }
-          }
-        },
-        {
-          "name": "f",
-          "type": "u8"
-        },
-        {
-          "name": "activationTime",
-          "type": "u32"
-        }
-      ]
-    },
-    {
       "name": "setConfig",
+      "docs": [
+        "Sets the DON configuration for a config digest. Creates the config PDA derived from `[config_digest]`"
+      ],
       "accounts": [
         {
           "name": "verifierAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configAccount",
           "isMut": true,
           "isSigner": false
         },
         {
           "name": "owner",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
+        {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
         {
           "name": "signers",
           "type": {
@@ -102,7 +88,155 @@
       ]
     },
     {
-      "name": "setConfigActive",
+      "name": "updateConfig",
+      "docs": [
+        "Replaces the signers and fault tolerance of an existing config digest. The active state is unchanged"
+      ],
+      "accounts": [
+        {
+          "name": "verifierAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "signers",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          }
+        },
+        {
+          "name": "f",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "activateConfig",
+      "accounts": [
+        {
+          "name": "verifierAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "deactivateConfig",
+      "accounts": [
+        {
+          "name": "verifierAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "closeConfig",
+      "docs": [
+        "Closes the config PDA for a config digest and refunds its rent to the owner"
+      ],
+      "accounts": [
+        {
+          "name": "verifierAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "setLegacyFallback",
+      "docs": [
+        "Enables or disables falling back to the legacy `don_configs` when no config PDA exists for a report's digest"
+      ],
       "accounts": [
         {
           "name": "verifierAccount",
@@ -117,30 +251,10 @@
       ],
       "args": [
         {
-          "name": "donConfigIndex",
-          "type": "u64"
-        },
-        {
-          "name": "isActive",
-          "type": "u8"
+          "name": "enabled",
+          "type": "bool"
         }
       ]
-    },
-    {
-      "name": "removeLatestConfig",
-      "accounts": [
-        {
-          "name": "verifierAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
     },
     {
       "name": "setAccessController",
@@ -321,6 +435,64 @@
   ],
   "accounts": [
     {
+      "name": "DigestConfig",
+      "docs": [
+        "DON configuration for a single config digest.",
+        "Stored in a PDA derived from `[config_digest]`, which is the same account the client passes as",
+        "`config_account` when verifying a report (seed = first 32 bytes of the uncompressed report)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "configDigest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "signers",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  20
+                ]
+              }
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "VerifierAccount",
       "type": {
         "kind": "struct",
@@ -330,11 +502,15 @@
             "type": "u8"
           },
           {
+            "name": "legacyFallbackDisabled",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                7
+                6
               ]
             }
           },
@@ -492,23 +668,43 @@
       "name": "ConfigActivated",
       "fields": [
         {
-          "name": "donConfigId",
-          "type": "string",
-          "index": false
-        },
-        {
-          "name": "isActive",
-          "type": "bool",
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
           "index": false
         }
       ]
     },
     {
-      "name": "ConfigRemoved",
+      "name": "ConfigDeactivated",
       "fields": [
         {
-          "name": "donConfigId",
-          "type": "string",
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ConfigClosed",
+      "fields": [
+        {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
           "index": false
         }
       ]
@@ -537,8 +733,13 @@
       "name": "ConfigSet",
       "fields": [
         {
-          "name": "donConfigId",
-          "type": "string",
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
           "index": false
         },
         {
@@ -557,10 +758,47 @@
           "name": "f",
           "type": "u8",
           "index": false
+        }
+      ]
+    },
+    {
+      "name": "ConfigUpdated",
+      "fields": [
+        {
+          "name": "configDigest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
         },
         {
-          "name": "donConfigIndex",
-          "type": "u16",
+          "name": "signers",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          "index": false
+        },
+        {
+          "name": "f",
+          "type": "u8",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "LegacyFallbackSet",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
           "index": false
         }
       ]
@@ -666,6 +904,21 @@
       "code": 6017,
       "name": "InvalidInputs",
       "msg": "Invalid inputs"
+    },
+    {
+      "code": 6018,
+      "name": "DigestEmpty",
+      "msg": "Config digest is empty"
+    },
+    {
+      "code": 6019,
+      "name": "DigestNotSet",
+      "msg": "Config digest is not set"
+    },
+    {
+      "code": 6020,
+      "name": "ConfigDigestAlreadySet",
+      "msg": "Config digest is already set"
     }
   ]
 }

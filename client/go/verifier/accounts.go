@@ -7,11 +7,120 @@ import (
 	ag_binary "github.com/gagliardetto/binary"
 )
 
+type DigestConfig struct {
+	Version      uint8
+	ConfigDigest [32]uint8
+	F            uint8
+	IsActive     bool
+	Bump         uint8
+	Signers      [][20]uint8
+	Reserved     [32]uint8
+}
+
+var DigestConfigDiscriminator = [8]byte{164, 237, 222, 122, 66, 51, 150, 114}
+
+func (obj DigestConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(DigestConfigDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ConfigDigest` param:
+	err = encoder.Encode(obj.ConfigDigest)
+	if err != nil {
+		return err
+	}
+	// Serialize `F` param:
+	err = encoder.Encode(obj.F)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsActive` param:
+	err = encoder.Encode(obj.IsActive)
+	if err != nil {
+		return err
+	}
+	// Serialize `Bump` param:
+	err = encoder.Encode(obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Serialize `Signers` param:
+	err = encoder.Encode(obj.Signers)
+	if err != nil {
+		return err
+	}
+	// Serialize `Reserved` param:
+	err = encoder.Encode(obj.Reserved)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DigestConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(DigestConfigDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[164 237 222 122 66 51 150 114]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ConfigDigest`:
+	err = decoder.Decode(&obj.ConfigDigest)
+	if err != nil {
+		return err
+	}
+	// Deserialize `F`:
+	err = decoder.Decode(&obj.F)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsActive`:
+	err = decoder.Decode(&obj.IsActive)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bump`:
+	err = decoder.Decode(&obj.Bump)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Signers`:
+	err = decoder.Decode(&obj.Signers)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Reserved`:
+	err = decoder.Decode(&obj.Reserved)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type VerifierAccount struct {
-	Version               uint8
-	Padding               [7]uint8
-	VerifierAccountConfig VerifierAccountConfig
-	DonConfigs            DonConfigs
+	Version                uint8
+	LegacyFallbackDisabled uint8
+	Padding                [6]uint8
+	VerifierAccountConfig  VerifierAccountConfig
+	DonConfigs             DonConfigs
 }
 
 var VerifierAccountDiscriminator = [8]byte{81, 120, 248, 87, 107, 174, 58, 157}
@@ -24,6 +133,11 @@ func (obj VerifierAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `LegacyFallbackDisabled` param:
+	err = encoder.Encode(obj.LegacyFallbackDisabled)
 	if err != nil {
 		return err
 	}
@@ -61,6 +175,11 @@ func (obj *VerifierAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LegacyFallbackDisabled`:
+	err = decoder.Decode(&obj.LegacyFallbackDisabled)
 	if err != nil {
 		return err
 	}

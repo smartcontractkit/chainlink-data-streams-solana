@@ -18,8 +18,6 @@ use state::*;
 use util::*;
 
 use evm::Encoder;
-use hex::encode as hex_encode;
-use std::borrow::BorrowMut;
 use std::cell::Ref;
 
 declare_id!("Gt9S41PtjR58CbG9JhJ3J6vxesqrNAswbWYbLNTMZA3c");
@@ -39,153 +37,106 @@ pub mod verifier {
         Ok(())
     }
 
-    pub fn set_config_with_activation_time(
-        ctx: Context<UpdateConfigContext>,
+    /// Sets the DON configuration for a config digest. Creates the config PDA derived from `[config_digest]`
+    pub fn set_config(
+        ctx: Context<SetConfigContext>,
+        config_digest: [u8; 32],
         signers: Vec<[u8; 20]>,
         f: u8,
-        activation_time: u32,
     ) -> Result<()> {
-        require!(f > 0, errors::ErrorCode::FaultToleranceMustBePositive);
+        let config_account = &mut ctx.accounts.config_account;
 
+        // An initialized config account always has a non-zero version
         require!(
-            signers.len() > 3 * f as usize,
-            errors::ErrorCode::InsufficientSigners
+            config_account.version == 0,
+            errors::ErrorCode::ConfigDigestAlreadySet
         );
 
-        require!(
-            signers.len() <= MAX_NUMBER_OF_ORACLES as usize,
-            errors::ErrorCode::ExcessSigners
-        );
+        let sorted_signers = validate_config(&config_digest, signers, f)?;
 
-        // Check that activationTime is not in the future.
-        require!(
-            activation_time <= Clock::get()?.unix_timestamp as u32,
-            errors::ErrorCode::BadActivationTime
-        );
-
-        let mut verifier_account = ctx.accounts.verifier_account.load_mut()?;
-
-        // Check we haven't reached the max number of configs
-        require!(
-            verifier_account.don_configs.len() < MAX_NUMBER_OF_DON_CONFIGS,
-            errors::ErrorCode::MaxNumberOfConfigsReached
-        );
-
-        // Sort signers to ensure donConfigId is deterministic.
-        let mut sorted_signers = signers;
-        sorted_signers.sort_unstable();
-
-        // Check for duplicate addresses in signers.
-        require!(
-            !SliceUtil::has_duplicates_sorted(&sorted_signers),
-            errors::ErrorCode::NonUniqueSignatures
-        );
-
-        let don_config_id = Encoder::compute_don_config_id(&Encoder::encode_don_config_id(&sorted_signers, f));
-
-        // Check if there are any existing configs
-        if let Some(last_don_config) = verifier_account.don_configs.last() {
-            // Check the config we're setting isn't already set as the current active config as this will increase search costs unnecessarily when verifying historic reports
-            require!(
-                last_don_config.don_config_id != don_config_id,
-                errors::ErrorCode::DonConfigAlreadyExists
-            );
-
-            // Check that activation time is after the last config
-            require!(
-                last_don_config.activation_time < activation_time,
-                errors::ErrorCode::BadActivationTime
-            );
-        }
-
-        // Register the signers for this DON
-        let mut signers_array = SigningKeys::default();
-        for signer in sorted_signers.iter() {
-            require!(
-                !is_zero_address(signer),
-                errors::ErrorCode::ZeroAddress
-            );
-
-            signers_array.push(SigningKey {
-                key: *signer,
-            });
-        }
-
-        verifier_account.don_configs.push(DonConfig {
-            don_config_id,
-            f,
-            is_active: 1,
-            activation_time,
-            _padding: 0,
-            signers: signers_array,
-        });
+        config_account.version = DIGEST_CONFIG_VERSION;
+        config_account.config_digest = config_digest;
+        config_account.f = f;
+        config_account.is_active = true;
+        config_account.bump = ctx.bumps.config_account;
+        config_account.signers = sorted_signers.clone();
 
         emit!(ConfigSet {
-            don_config_id: hex_encode(don_config_id),
+            config_digest,
             signers: sorted_signers,
             f,
-            don_config_index: (verifier_account.don_configs.len() - 1) as u16,
         });
 
         Ok(())
     }
 
-    pub fn set_config(
-        ctx: Context<UpdateConfigContext>,
+    /// Replaces the signers and fault tolerance of an existing config digest. The active state is unchanged
+    pub fn update_config(
+        ctx: Context<UpdateDigestConfigContext>,
+        config_digest: [u8; 32],
         signers: Vec<[u8; 20]>,
         f: u8,
     ) -> Result<()> {
-        set_config_with_activation_time(
-            ctx,
-            signers,
-            f,
-            Clock::get()?.unix_timestamp as u32,
-        )
-    }
+        let sorted_signers = validate_config(&config_digest, signers, f)?;
 
-    pub fn set_config_active(
-        ctx: Context<UpdateConfigContext>,
-        don_config_index: u64,
-        is_active: u8,
-    ) -> Result<()> {
-        let mut verifier_account = ctx.accounts.verifier_account.load_mut()?;
-        require!(
-            don_config_index < verifier_account.don_configs.len() as u64,
-            errors::ErrorCode::DonConfigDoesNotExist
-        );
-        verifier_account.don_configs[don_config_index as usize].is_active = is_active;
-        emit!(ConfigActivated {
-            don_config_id: hex_encode(
-                verifier_account.don_configs[don_config_index as usize].don_config_id
-            ),
-            is_active: is_active != 0,
+        let config_account = &mut ctx.accounts.config_account;
+        config_account.f = f;
+        config_account.signers = sorted_signers.clone();
+
+        emit!(ConfigUpdated {
+            config_digest,
+            signers: sorted_signers,
+            f,
         });
+
         Ok(())
     }
 
-    pub fn remove_latest_config(ctx: Context<UpdateConfigContext>) -> Result<()> {
+    pub fn activate_config(
+        ctx: Context<UpdateDigestConfigContext>,
+        config_digest: [u8; 32],
+    ) -> Result<()> {
+        ctx.accounts.config_account.is_active = true;
+        emit!(ConfigActivated { config_digest });
+        Ok(())
+    }
+
+    pub fn deactivate_config(
+        ctx: Context<UpdateDigestConfigContext>,
+        config_digest: [u8; 32],
+    ) -> Result<()> {
+        ctx.accounts.config_account.is_active = false;
+        emit!(ConfigDeactivated { config_digest });
+        Ok(())
+    }
+
+    /// Closes the config PDA for a config digest and refunds its rent to the owner
+    pub fn close_config(
+        _ctx: Context<CloseConfigContext>,
+        config_digest: [u8; 32],
+    ) -> Result<()> {
+        emit!(ConfigClosed { config_digest });
+        Ok(())
+    }
+
+    /// Enables or disables falling back to the legacy `don_configs` when no config PDA exists for a report's digest
+    pub fn set_legacy_fallback(ctx: Context<UpdateConfigContext>, enabled: bool) -> Result<()> {
         let mut verifier_account = ctx.accounts.verifier_account.load_mut()?;
-        require!(
-            !verifier_account.don_configs.is_empty(),
-            errors::ErrorCode::DonConfigDoesNotExist
-        );
-        let c = verifier_account.don_configs.pop().unwrap();
-        emit!(ConfigRemoved {
-            don_config_id: hex_encode(c.don_config_id)
-        });
+        verifier_account.legacy_fallback_disabled = u8::from(!enabled);
+        emit!(LegacyFallbackSet { enabled });
         Ok(())
     }
 
     /// Used to Set the access controller
-    /// We use an optional access controller. 
-    /// See https://github.com/coral-xyz/anchor/pull/2101 on how option works in Anchor 
+    /// We use an optional access controller.
+    /// See https://github.com/coral-xyz/anchor/pull/2101 on how option works in Anchor
     pub fn set_access_controller(ctx: Context<SetAccessControllerContext>) -> Result<()> {
         let mut verifier_account = ctx.accounts.verifier_account.load_mut()?;
 
         verifier_account.verifier_account_config.access_controller = ctx.accounts.access_controller
             .as_ref()
             .map_or(Pubkey::default(), |ac| ac.key());
-        
+
         emit!(AccessControllerSet {
             access_controller: verifier_account.verifier_account_config.access_controller.key()
         });
@@ -201,8 +152,8 @@ pub mod verifier {
     }
 
     /// Initializes the verifier (admin) account data. Call after initialize + realloc
-    /// We use an optional access controller. 
-    /// See https://github.com/coral-xyz/anchor/pull/2101 on how option works in Anchor 
+    /// We use an optional access controller.
+    /// See https://github.com/coral-xyz/anchor/pull/2101 on how option works in Anchor
     pub fn initialize_account_data(
         ctx: Context<InitializeAccountDataContext>
     ) -> Result<()> {
@@ -237,12 +188,50 @@ pub mod verifier {
     }
 }
 
+/// Validates a DON configuration and returns the signers sorted
+fn validate_config(config_digest: &[u8; 32], signers: Vec<[u8; 20]>, f: u8) -> Result<Vec<[u8; 20]>> {
+    require!(
+        *config_digest != [0u8; 32],
+        errors::ErrorCode::DigestEmpty
+    );
+
+    require!(f > 0, errors::ErrorCode::FaultToleranceMustBePositive);
+
+    require!(
+        signers.len() > 3 * f as usize,
+        errors::ErrorCode::InsufficientSigners
+    );
+
+    require!(
+        signers.len() <= MAX_NUMBER_OF_ORACLES as usize,
+        errors::ErrorCode::ExcessSigners
+    );
+
+    let mut sorted_signers = signers;
+    sorted_signers.sort_unstable();
+
+    // Check for duplicate addresses in signers.
+    require!(
+        !SliceUtil::has_duplicates_sorted(&sorted_signers),
+        errors::ErrorCode::NonUniqueSignatures
+    );
+
+    for signer in sorted_signers.iter() {
+        require!(
+            !is_zero_address(signer),
+            errors::ErrorCode::ZeroAddress
+        );
+    }
+
+    Ok(sorted_signers)
+}
+
 fn verify_report(
     ctx: &Context<VerifyContext>,
     signed_report: &[u8],
     verifier_account: &Ref<VerifierAccount>
 ) -> Result<Vec<u8>> {
-    
+
     let decompressed_report = Compressor::decompress(signed_report);
 
     let SignedReport {
@@ -303,36 +292,56 @@ fn verify_report(
     // Parse report details from report_data
     let report = Encoder::parse_report_details_from_report(report_data)?;
 
-    // Find the active DON configuration based on the report timestamp
-    let active_don_config = verifier_account
-        .don_configs
-        .iter()
-        .rev()
-        .find(|config| config.activation_time <= report.report_timestamp)
-        .ok_or(errors::ErrorCode::BadVerification)?;
+    let (f, registered_signers) = if ctx.accounts.config_account.owner == &ID {
+        // The config PDA for the report's digest exists
+        let data = ctx.accounts.config_account.try_borrow_data()?;
+        let digest_config = DigestConfig::try_deserialize(&mut &data[..])?;
 
-    // Ensure the active DON is indeed active
-    require!(
-        active_don_config.is_active != 0,
-        errors::ErrorCode::ConfigDeactivated
-    );
+        require!(
+            digest_config.config_digest == report_context[0],
+            errors::ErrorCode::InvalidConfigAccount
+        );
+
+        require!(
+            digest_config.is_active,
+            errors::ErrorCode::ConfigDeactivated
+        );
+
+        (digest_config.f, digest_config.signers)
+    } else if verifier_account.legacy_fallback_disabled == 0 {
+        // No config PDA for the report's digest. Find the legacy DON configuration based on the report timestamp
+        msg!("legacy config fallback");
+
+        let active_don_config = verifier_account
+            .don_configs
+            .iter()
+            .rev()
+            .find(|config| config.activation_time <= report.report_timestamp)
+            .ok_or(errors::ErrorCode::BadVerification)?;
+
+        // Ensure the active DON is indeed active
+        require!(
+            active_don_config.is_active != 0,
+            errors::ErrorCode::ConfigDeactivated
+        );
+
+        (
+            active_don_config.f,
+            active_don_config.signers.iter().map(|s| s.key).collect::<Vec<[u8; 20]>>(),
+        )
+    } else {
+        return Err(errors::ErrorCode::DigestNotSet.into());
+    };
 
     // Verify that the number of signers exceeds the threshold 'f'
     require!(
-        signers.len() > active_don_config.f as usize,
+        signers.len() > f as usize,
         errors::ErrorCode::BadVerification
     );
 
-    // Get registered signers
-    let registered_signers: Vec<&[u8; 20]> = active_don_config
-        .signers
-        .iter()
-        .map(|s| &s.key)
-        .collect();
-
     // Check each signer is registered
     for signer in signers.iter() {
-        if !registered_signers.iter().any(|registered| signer == *registered) {
+        if !registered_signers.iter().any(|registered| signer == registered) {
             return Err(errors::ErrorCode::BadVerification.into());
         }
     }
