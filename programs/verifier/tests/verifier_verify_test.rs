@@ -473,8 +473,9 @@ async fn test_verify_reports_from_multiple_dons() {
             .await,
     );
 
-    // A report signed by DON A's signers for DON B's digest does not verify
-    let (cross_report, _) = generate_report_with_signers_and_digest::<V3Report>(digest_b, 4, 4, None, Some(signers_a));
+    // A report for DON A's digest signed by DON B's signers does not verify. Two signatures pass
+    // A's signature count (f = 1), so it is rejected because the signers are not registered for A
+    let (cross_report, _) = generate_report_with_signers_and_digest::<V3Report>(digest_a, 16, 2, None, Some(signers_b));
     Assert::transaction_error(
         &verifier_client
             .verify(&mut environment_context, &user, Compressor::compress(&cross_report), None)
