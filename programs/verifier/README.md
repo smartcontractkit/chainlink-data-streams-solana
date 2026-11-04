@@ -66,6 +66,9 @@ anchor build
 
 The compiled programs will be in `target/deploy/` folder and the IDL will be in `target/idl/` folder.
 
+This build is for development and tests. Binaries for devnet or mainnet are built with `solana-verify`, see
+[Building a release](../../README.md#building-a-release).
+
 Testing the programs
 
 Note: We set a large stack size as tests will use Anchor deserialization of the full account data to validate state.
