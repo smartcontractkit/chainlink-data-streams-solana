@@ -62,11 +62,14 @@ arrayvec!(DonConfigs, DonConfig, u16);
 pub struct VerifierAccount {
     // Versioning for migrating state
     pub version: u8,
+    // 0 = verify falls back to `don_configs` when no config PDA exists for the report's digest.
+    // 1 = fallback disabled.
+    pub legacy_fallback_disabled: u8,
     // Add padding to ensure 8-byte alignment
-    pub padding: [u8; 7],
+    pub padding: [u8; 6],
     // Account configuration
     pub verifier_account_config: VerifierAccountConfig,
-    // The list of DON configurations to lookup when verifying a report
+    // Legacy DON configurations, looked up by report timestamp. Only read by the legacy fallback in verify
     pub don_configs: DonConfigs
 }
 

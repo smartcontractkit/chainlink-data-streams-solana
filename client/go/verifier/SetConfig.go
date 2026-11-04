@@ -10,23 +10,34 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetConfig is the `setConfig` instruction.
+// Sets the DON configuration for a config digest. Creates the config PDA derived from `[config_digest]`
 type SetConfig struct {
-	Signers *[][20]uint8
-	F       *uint8
+	ConfigDigest *[32]uint8
+	Signers      *[][20]uint8
+	F            *uint8
 
-	// [0] = [WRITE] verifierAccount
+	// [0] = [] verifierAccount
 	//
-	// [1] = [SIGNER] owner
+	// [1] = [WRITE] configAccount
+	//
+	// [2] = [WRITE, SIGNER] owner
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewSetConfigInstructionBuilder creates a new `SetConfig` instruction builder.
 func NewSetConfigInstructionBuilder() *SetConfig {
 	nd := &SetConfig{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
+}
+
+// SetConfigDigest sets the "configDigest" parameter.
+func (inst *SetConfig) SetConfigDigest(configDigest [32]uint8) *SetConfig {
+	inst.ConfigDigest = &configDigest
+	return inst
 }
 
 // SetSigners sets the "signers" parameter.
@@ -43,7 +54,7 @@ func (inst *SetConfig) SetF(f uint8) *SetConfig {
 
 // SetVerifierAccountAccount sets the "verifierAccount" account.
 func (inst *SetConfig) SetVerifierAccountAccount(verifierAccount ag_solanago.PublicKey) *SetConfig {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(verifierAccount).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(verifierAccount)
 	return inst
 }
 
@@ -52,15 +63,37 @@ func (inst *SetConfig) GetVerifierAccountAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(0)
 }
 
+// SetConfigAccountAccount sets the "configAccount" account.
+func (inst *SetConfig) SetConfigAccountAccount(configAccount ag_solanago.PublicKey) *SetConfig {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(configAccount).WRITE()
+	return inst
+}
+
+// GetConfigAccountAccount gets the "configAccount" account.
+func (inst *SetConfig) GetConfigAccountAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice.Get(1)
+}
+
 // SetOwnerAccount sets the "owner" account.
 func (inst *SetConfig) SetOwnerAccount(owner ag_solanago.PublicKey) *SetConfig {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(owner).SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(owner).WRITE().SIGNER()
 	return inst
 }
 
 // GetOwnerAccount gets the "owner" account.
 func (inst *SetConfig) GetOwnerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice.Get(2)
+}
+
+// SetSystemProgramAccount sets the "systemProgram" account.
+func (inst *SetConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetConfig {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	return inst
+}
+
+// GetSystemProgramAccount gets the "systemProgram" account.
+func (inst *SetConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst SetConfig) Build() *Instruction {
@@ -83,6 +116,9 @@ func (inst SetConfig) ValidateAndBuild() (*Instruction, error) {
 func (inst *SetConfig) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.ConfigDigest == nil {
+			return errors.New("ConfigDigest parameter is not set")
+		}
 		if inst.Signers == nil {
 			return errors.New("Signers parameter is not set")
 		}
@@ -97,7 +133,13 @@ func (inst *SetConfig) Validate() error {
 			return errors.New("accounts.VerifierAccount is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.ConfigAccount is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Owner is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
 	return nil
@@ -112,21 +154,29 @@ func (inst *SetConfig) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Signers", *inst.Signers))
-						paramsBranch.Child(ag_format.Param("      F", *inst.F))
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("ConfigDigest", *inst.ConfigDigest))
+						paramsBranch.Child(ag_format.Param("     Signers", *inst.Signers))
+						paramsBranch.Child(ag_format.Param("           F", *inst.F))
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("verifier", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("   owner", inst.AccountMetaSlice.Get(1)))
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("     verifier", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("        owner", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
 }
 
 func (obj SetConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ConfigDigest` param:
+	err = encoder.Encode(obj.ConfigDigest)
+	if err != nil {
+		return err
+	}
 	// Serialize `Signers` param:
 	err = encoder.Encode(obj.Signers)
 	if err != nil {
@@ -140,6 +190,11 @@ func (obj SetConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 func (obj *SetConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ConfigDigest`:
+	err = decoder.Decode(&obj.ConfigDigest)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Signers`:
 	err = decoder.Decode(&obj.Signers)
 	if err != nil {
@@ -156,14 +211,20 @@ func (obj *SetConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 // NewSetConfigInstruction declares a new SetConfig instruction with the provided parameters and accounts.
 func NewSetConfigInstruction(
 	// Parameters:
+	configDigest [32]uint8,
 	signers [][20]uint8,
 	f uint8,
 	// Accounts:
 	verifierAccount ag_solanago.PublicKey,
-	owner ag_solanago.PublicKey) *SetConfig {
+	configAccount ag_solanago.PublicKey,
+	owner ag_solanago.PublicKey,
+	systemProgram ag_solanago.PublicKey) *SetConfig {
 	return NewSetConfigInstructionBuilder().
+		SetConfigDigest(configDigest).
 		SetSigners(signers).
 		SetF(f).
 		SetVerifierAccountAccount(verifierAccount).
-		SetOwnerAccount(owner)
+		SetConfigAccountAccount(configAccount).
+		SetOwnerAccount(owner).
+		SetSystemProgramAccount(systemProgram)
 }

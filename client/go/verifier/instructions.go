@@ -30,13 +30,21 @@ func init() {
 var (
 	Instruction_Verify = ag_binary.TypeID([8]byte{133, 161, 141, 48, 120, 198, 88, 150})
 
-	Instruction_SetConfigWithActivationTime = ag_binary.TypeID([8]byte{189, 64, 69, 231, 128, 29, 197, 29})
-
+	// Sets the DON configuration for a config digest. Creates the config PDA derived from `[config_digest]`
 	Instruction_SetConfig = ag_binary.TypeID([8]byte{108, 158, 154, 175, 212, 98, 52, 66})
 
-	Instruction_SetConfigActive = ag_binary.TypeID([8]byte{90, 95, 224, 173, 96, 184, 36, 136})
+	// Replaces the signers and fault tolerance of an existing config digest. The active state is unchanged
+	Instruction_UpdateConfig = ag_binary.TypeID([8]byte{29, 158, 252, 191, 10, 83, 219, 99})
 
-	Instruction_RemoveLatestConfig = ag_binary.TypeID([8]byte{171, 221, 188, 175, 156, 87, 156, 63})
+	Instruction_ActivateConfig = ag_binary.TypeID([8]byte{125, 127, 55, 160, 125, 212, 222, 207})
+
+	Instruction_DeactivateConfig = ag_binary.TypeID([8]byte{240, 42, 36, 120, 166, 3, 130, 231})
+
+	// Closes the config PDA for a config digest and refunds its rent to the owner
+	Instruction_CloseConfig = ag_binary.TypeID([8]byte{145, 9, 72, 157, 95, 125, 61, 85})
+
+	// Enables or disables falling back to the legacy `don_configs` when no config PDA exists for a report's digest
+	Instruction_SetLegacyFallback = ag_binary.TypeID([8]byte{217, 148, 168, 130, 83, 167, 106, 82})
 
 	// Used to Set the access controller
 	// We use an optional access controller.
@@ -63,14 +71,18 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Verify:
 		return "Verify"
-	case Instruction_SetConfigWithActivationTime:
-		return "SetConfigWithActivationTime"
 	case Instruction_SetConfig:
 		return "SetConfig"
-	case Instruction_SetConfigActive:
-		return "SetConfigActive"
-	case Instruction_RemoveLatestConfig:
-		return "RemoveLatestConfig"
+	case Instruction_UpdateConfig:
+		return "UpdateConfig"
+	case Instruction_ActivateConfig:
+		return "ActivateConfig"
+	case Instruction_DeactivateConfig:
+		return "DeactivateConfig"
+	case Instruction_CloseConfig:
+		return "CloseConfig"
+	case Instruction_SetLegacyFallback:
+		return "SetLegacyFallback"
 	case Instruction_SetAccessController:
 		return "SetAccessController"
 	case Instruction_Initialize:
@@ -107,16 +119,22 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"verify", (*Verify)(nil),
 		},
 		{
-			"set_config_with_activation_time", (*SetConfigWithActivationTime)(nil),
-		},
-		{
 			"set_config", (*SetConfig)(nil),
 		},
 		{
-			"set_config_active", (*SetConfigActive)(nil),
+			"update_config", (*UpdateConfig)(nil),
 		},
 		{
-			"remove_latest_config", (*RemoveLatestConfig)(nil),
+			"activate_config", (*ActivateConfig)(nil),
+		},
+		{
+			"deactivate_config", (*DeactivateConfig)(nil),
+		},
+		{
+			"close_config", (*CloseConfig)(nil),
+		},
+		{
+			"set_legacy_fallback", (*SetLegacyFallback)(nil),
 		},
 		{
 			"set_access_controller", (*SetAccessController)(nil),

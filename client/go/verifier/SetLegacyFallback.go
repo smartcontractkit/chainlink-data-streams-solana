@@ -10,8 +10,9 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// RemoveLatestConfig is the `removeLatestConfig` instruction.
-type RemoveLatestConfig struct {
+// Enables or disables falling back to the legacy `don_configs` when no config PDA exists for a report's digest
+type SetLegacyFallback struct {
+	Enabled *bool
 
 	// [0] = [WRITE] verifierAccount
 	//
@@ -19,54 +20,67 @@ type RemoveLatestConfig struct {
 	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
-// NewRemoveLatestConfigInstructionBuilder creates a new `RemoveLatestConfig` instruction builder.
-func NewRemoveLatestConfigInstructionBuilder() *RemoveLatestConfig {
-	nd := &RemoveLatestConfig{
+// NewSetLegacyFallbackInstructionBuilder creates a new `SetLegacyFallback` instruction builder.
+func NewSetLegacyFallbackInstructionBuilder() *SetLegacyFallback {
+	nd := &SetLegacyFallback{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
 }
 
+// SetEnabled sets the "enabled" parameter.
+func (inst *SetLegacyFallback) SetEnabled(enabled bool) *SetLegacyFallback {
+	inst.Enabled = &enabled
+	return inst
+}
+
 // SetVerifierAccountAccount sets the "verifierAccount" account.
-func (inst *RemoveLatestConfig) SetVerifierAccountAccount(verifierAccount ag_solanago.PublicKey) *RemoveLatestConfig {
+func (inst *SetLegacyFallback) SetVerifierAccountAccount(verifierAccount ag_solanago.PublicKey) *SetLegacyFallback {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(verifierAccount).WRITE()
 	return inst
 }
 
 // GetVerifierAccountAccount gets the "verifierAccount" account.
-func (inst *RemoveLatestConfig) GetVerifierAccountAccount() *ag_solanago.AccountMeta {
+func (inst *SetLegacyFallback) GetVerifierAccountAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetOwnerAccount sets the "owner" account.
-func (inst *RemoveLatestConfig) SetOwnerAccount(owner ag_solanago.PublicKey) *RemoveLatestConfig {
+func (inst *SetLegacyFallback) SetOwnerAccount(owner ag_solanago.PublicKey) *SetLegacyFallback {
 	inst.AccountMetaSlice[1] = ag_solanago.Meta(owner).SIGNER()
 	return inst
 }
 
 // GetOwnerAccount gets the "owner" account.
-func (inst *RemoveLatestConfig) GetOwnerAccount() *ag_solanago.AccountMeta {
+func (inst *SetLegacyFallback) GetOwnerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(1)
 }
 
-func (inst RemoveLatestConfig) Build() *Instruction {
+func (inst SetLegacyFallback) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_RemoveLatestConfig,
+		TypeID: Instruction_SetLegacyFallback,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst RemoveLatestConfig) ValidateAndBuild() (*Instruction, error) {
+func (inst SetLegacyFallback) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *RemoveLatestConfig) Validate() error {
+func (inst *SetLegacyFallback) Validate() error {
+	// Check whether all (required) parameters are set:
+	{
+		if inst.Enabled == nil {
+			return errors.New("Enabled parameter is not set")
+		}
+	}
+
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -79,16 +93,18 @@ func (inst *RemoveLatestConfig) Validate() error {
 	return nil
 }
 
-func (inst *RemoveLatestConfig) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *SetLegacyFallback) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("RemoveLatestConfig")).
+			programBranch.Child(ag_format.Instruction("SetLegacyFallback")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("Enabled", *inst.Enabled))
+					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -99,19 +115,32 @@ func (inst *RemoveLatestConfig) EncodeToTree(parent ag_treeout.Branches) {
 		})
 }
 
-func (obj RemoveLatestConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj SetLegacyFallback) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Enabled` param:
+	err = encoder.Encode(obj.Enabled)
+	if err != nil {
+		return err
+	}
 	return nil
 }
-func (obj *RemoveLatestConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *SetLegacyFallback) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Enabled`:
+	err = decoder.Decode(&obj.Enabled)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-// NewRemoveLatestConfigInstruction declares a new RemoveLatestConfig instruction with the provided parameters and accounts.
-func NewRemoveLatestConfigInstruction(
+// NewSetLegacyFallbackInstruction declares a new SetLegacyFallback instruction with the provided parameters and accounts.
+func NewSetLegacyFallbackInstruction(
+	// Parameters:
+	enabled bool,
 	// Accounts:
 	verifierAccount ag_solanago.PublicKey,
-	owner ag_solanago.PublicKey) *RemoveLatestConfig {
-	return NewRemoveLatestConfigInstructionBuilder().
+	owner ag_solanago.PublicKey) *SetLegacyFallback {
+	return NewSetLegacyFallbackInstructionBuilder().
+		SetEnabled(enabled).
 		SetVerifierAccountAccount(verifierAccount).
 		SetOwnerAccount(owner)
 }

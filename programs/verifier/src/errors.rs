@@ -1,5 +1,6 @@
 use anchor_lang::error_code;
 
+// New errors must be appended to keep existing error codes stable for integrators
 #[error_code]
 pub enum ErrorCode {
     #[msg("Zero Address")]
@@ -38,4 +39,10 @@ pub enum ErrorCode {
     ConfigDeactivated,
     #[msg("Invalid inputs")]
     InvalidInputs,
+    #[msg("Config digest is empty")]
+    DigestEmpty,
+    #[msg("Config digest is not set")]
+    DigestNotSet,
+    #[msg("Config digest is already set")]
+    ConfigDigestAlreadySet,
 }

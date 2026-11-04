@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_SetConfigWithActivationTime(t *testing.T) {
+func TestEncodeDecode_SetLegacyFallback(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("SetConfigWithActivationTime"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("SetLegacyFallback"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(SetConfigWithActivationTime)
+				params := new(SetLegacyFallback)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(SetConfigWithActivationTime)
+				got := new(SetLegacyFallback)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

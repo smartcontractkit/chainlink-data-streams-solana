@@ -15,7 +15,29 @@ The accounts that are required to be passed to the verifier program are:
 - The signer of the transaction
 - The report config account (PDA)
     - Derived from the first 32 bytes of the uncompressed report received from the data streams off-chain server.
+      These bytes are the report's config digest, and the account holds the DON configuration for that digest.
       The SDK has a utility method to do this for you.
+
+## DON Configurations
+DON configurations are keyed by config digest, consistent with the EVM (v0.5.0+), Aptos, Sui and Stellar verifiers.
+Each digest's configuration (signers, `f`, active state) is stored in its own PDA derived from `[config_digest]`.
+Reports are verified against the configuration of the digest they were signed for, so reports from multiple DONs
+can be verified at the same time.
+
+Owner instructions:
+- `set_config(config_digest, signers, f)` creates the config account for a digest. Fails if the digest is already set.
+- `update_config(config_digest, signers, f)` replaces the signers and `f` of a digest.
+- `activate_config(config_digest)` / `deactivate_config(config_digest)`
+- `close_config(config_digest)` deletes the config account and refunds its rent to the owner.
+- `set_legacy_fallback(enabled)` see below.
+
+All config accounts can be listed with `getProgramAccounts` filtered by the `DigestConfig` account discriminator.
+
+### Legacy Configurations
+Before v0.5.0 configurations were stored in the verifier account and selected by report timestamp. These are kept
+read-only. While the legacy fallback is enabled (the default), a report whose digest has no config account is
+verified against the legacy configurations, and `legacy config fallback` is logged. Once all digests in use have
+a config account, disable the fallback with `set_legacy_fallback(false)` so only registered digests verify.
 
 ### Integration Examples
 - [On-Chain Integration](https://docs.chain.link/data-streams/tutorials/streams-direct/solana-onchain-report-verification)
@@ -43,6 +65,9 @@ anchor build
 ```
 
 The compiled programs will be in `target/deploy/` folder and the IDL will be in `target/idl/` folder.
+
+This build is for development and tests. Binaries for devnet or mainnet are built with `solana-verify`, see
+[Building a release](../../README.md#building-a-release).
 
 Testing the programs
 

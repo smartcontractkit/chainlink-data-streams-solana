@@ -241,8 +241,21 @@ fn create_random_signer() -> Signer {
     }
 }
 
+/// Generates a config digest with the LLO prefix (0x0009) for tests. Different `n` give different digests
+pub fn test_config_digest(n: u8) -> [u8; 32] {
+    let mut digest = keccak256(&[n]);
+    digest[0] = 0x00;
+    digest[1] = 0x09;
+    digest
+}
+
 pub fn generate_report_with_signers<T: Report>(total_signers: usize, signers_per_report: usize, observation_timestamp: Option<u32>, override_signers: Option<Vec<Signer>>) -> (Vec<u8>, Vec<[u8; 20]>) {
-    let report_context: [[u8; 32]; 3] = [[0u8; 32], [0u8; 32], [0u8; 32]];
+    generate_report_with_signers_and_digest::<T>([0u8; 32], total_signers, signers_per_report, observation_timestamp, override_signers)
+}
+
+/// Same as `generate_report_with_signers` but signs the report for the given config digest (report_context[0])
+pub fn generate_report_with_signers_and_digest<T: Report>(config_digest: [u8; 32], total_signers: usize, signers_per_report: usize, observation_timestamp: Option<u32>, override_signers: Option<Vec<Signer>>) -> (Vec<u8>, Vec<[u8; 20]>) {
+    let report_context: [[u8; 32]; 3] = [config_digest, [0u8; 32], [0u8; 32]];
     let signer_set = match override_signers {
         Some(signers) => signers,
         None => get_signers(total_signers)
